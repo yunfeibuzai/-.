@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 麦卖云 V2bX 后端终极全能王牌脚本
-sh_ver="1.3.3"
+sh_ver="1.3.4"
 filepath=$(readlink -f "$0")
 
 red='\033[0;31m'
@@ -93,6 +93,7 @@ start_V2bX() {
 
 stop_V2bX() {
     if [[ x"${release}" == x"alpine" ]]; then service V2bX stop >/dev/null 2>&1; else systemctl stop V2bX >/dev/null 2>&1; fi
+    # 彻底爆破后台残存僵尸进程，不留任何吸血线程
     pidof V2bX | xargs kill -9 >/dev/null 2>&1
     echo -e "${green}V2bX 已彻底停止并释放残余内存${plain}"
 }
@@ -129,8 +130,21 @@ edit_config() {
 }
 
 install_bbr() {
-    # 彻底抛弃旧版，同步为你替换为 ylx.me 的经典黑科技豪华版 BBR 脚本
-    wget -O tcp.sh --no-check-certificate "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
+    echo -e "${yellow}正在强制物理清理可能盘踞在本地的旧版 BBR 垃圾残余...${plain}"
+    # 斩草除根，防止 Linux 重命名为 tcp.sh.1 导致运行老脚本
+    rm -f tcp.sh tcp.sh.* bbr.sh bbr.sh.*
+    
+    echo -e "${green}正在拉取全新豪华版 ylx.me BBR 黑科技网络加速控制台...${plain}"
+    # 使用 -O tcp.sh 强制重定向命名，双重保险覆盖
+    wget -O tcp.sh --no-check-certificate "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh"
+    
+    if [ -f tcp.sh ]; then
+        chmod +x tcp.sh
+        clear
+        ./tcp.sh
+    else
+        echo -e "${red}错误：豪华版 BBR 脚本下载失败，请检查网络或 GitHub 连通性！${plain}"
+    fi
 }
 
 update_shell() {
