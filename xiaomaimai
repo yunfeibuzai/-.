@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 麦卖云 V2bX 后端终极全能王牌脚本
-sh_ver="1.3.2"
+sh_ver="1.3.3"
 filepath=$(readlink -f "$0")
 
 red='\033[0;31m'
@@ -57,7 +57,7 @@ show_menu() {
     echo -e "  ${green}7.${plain} 查看 V2bX 状态        ${green}8.${plain} 查看 V2bX 日志"
     echo -e "————————————————"
     echo -e "  ${green}9.${plain} 设置 V2bX 开机自启    ${green}10.${plain} 取消 V2bX 开机自启"
-    echo -e "  ${green}11.${plain} 一键安装 bbr 内核     ${green}12.${plain} 查看 V2bX 版本"
+    echo -e "  ${green}11.${plain} 🚀 豪华版 BBR 控制台   ${green}12.${plain} 查看 V2bX 版本"
     echo -e "  ${green}13.${plain} 生成 x25519 密钥      ${green}14.${plain} 升级 V2bX 维护脚本"
     echo -e "  ${green}15.${plain} 生成 V2bX 配置文件"
     echo -e "————————————————"
@@ -93,7 +93,6 @@ start_V2bX() {
 
 stop_V2bX() {
     if [[ x"${release}" == x"alpine" ]]; then service V2bX stop >/dev/null 2>&1; else systemctl stop V2bX >/dev/null 2>&1; fi
-    # 彻底爆破后台残存僵尸进程，不留任何吸血线程
     pidof V2bX | xargs kill -9 >/dev/null 2>&1
     echo -e "${green}V2bX 已彻底停止并释放残余内存${plain}"
 }
@@ -130,7 +129,8 @@ edit_config() {
 }
 
 install_bbr() {
-    wget --no-check-certificate -N "https://github.com/teddysun/across/raw/master/bbr.sh" && chmod +x bbr.sh && ./bbr.sh
+    # 彻底抛弃旧版，同步为你替换为 ylx.me 的经典黑科技豪华版 BBR 脚本
+    wget -O tcp.sh --no-check-certificate "https://github.com/ylx2016/Linux-NetSpeed/raw/master/tcp.sh" && chmod +x tcp.sh && ./tcp.sh
 }
 
 update_shell() {
@@ -248,7 +248,7 @@ run_deep_log_clean() {
 start_daemon() {
     cat << 'EOF' > /usr/local/bin/V2bX_daemon.sh
 #!/bin/bash
-if [ -f /usr/local/V2bX/V2bX]; then
+if [ -f /usr/local/V2bX/V2bX ]; then
     if cat /proc/version 2>/dev/null | grep -Eqi "alpine"; then
         service V2bX status 2>&1 | grep -Eqi "started|running" || [ -f /run/V2bX.pid ] || service V2bX start
     else
@@ -291,6 +291,7 @@ view_vps_info() {
     echo -e "${cyan}================================================${plain}"
 }
 process_run() {
+    local num
     read -rp "请输入选择 [0-23]: " num
     case "$num" in
         0) edit_config ;;
