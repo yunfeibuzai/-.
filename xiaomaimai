@@ -15,6 +15,8 @@ plain='\033[0m'
 # 极轻量判定小鸡环境
 if cat /etc/issue 2>/dev/null | grep -Eqi "alpine" || cat /proc/version 2>/dev/null | grep -Eqi "alpine"; then
     release="alpine"
+else
+    release="standard"
 fi
 
 show_status() {
@@ -83,18 +85,17 @@ check_status() {
 
 start_V2bX() {
     check_status
-    if [[ $? == 0 ]]; then echo -e "${green}V2bX 已在运行中，无需重复启动${plain}"; sleep 1; return; fi
+    if [[ $? == 0 ]]; then echo -e "${green}V2bX 已在运行中，无需重复启动${plain}"; return; fi
     if [[ x"${release}" == x"alpine" ]]; then service V2bX start >/dev/null 2>&1; else systemctl start V2bX >/dev/null 2>&1; fi
     sleep 1 && check_status
     [[ $? == 0 ]] && echo -e "${green}V2bX 启动成功${plain}" || echo -e "${red}V2bX 启动失败，请检查日志${plain}"
-    sleep 1.5
 }
 
 stop_V2bX() {
     if [[ x"${release}" == x"alpine" ]]; then service V2bX stop >/dev/null 2>&1; else systemctl stop V2bX >/dev/null 2>&1; fi
+    # 彻底爆破后台残存僵尸进程，不留任何吸血线程
     pidof V2bX | xargs kill -9 >/dev/null 2>&1
     echo -e "${green}V2bX 已彻底停止并释放残余内存${plain}"
-    sleep 1.5
 }
 
 restart_V2bX() {
@@ -104,13 +105,11 @@ restart_V2bX() {
 enable_V2bX() {
     if [[ x"${release}" == x"alpine" ]]; then rc-update add V2bX default >/dev/null 2>&1; else systemctl enable V2bX >/dev/null 2>&1; fi
     echo -e "${green}已设置 V2bX 开机自启${plain}"
-    sleep 1.2
 }
 
 disable_V2bX() {
     if [[ x"${release}" == x"alpine" ]]; then rc-update del V2bX default >/dev/null 2>&1; else systemctl disable V2bX >/dev/null 2>&1; fi
     echo -e "${green}已取消 V2bX 开机自启${plain}"
-    sleep 1.2
 }
 view_log() {
     if [[ x"${release}" == x"alpine" ]]; then
@@ -127,7 +126,6 @@ edit_config() {
         vi /etc/V2bX/config.json
     else
         echo -e "${red}未检测到文本编辑器，请手动修改 /etc/V2bX/config.json${plain}"
-        sleep 2
     fi
 }
 
@@ -149,7 +147,6 @@ open_ports() {
     else
         echo -e "${yellow}未检测到 iptables，跳过配置${plain}"
     fi
-    sleep 1.5
 }
 run_clean_script() {
     echo -e "\n\033[1;33m========== [1] 物理内存总体概况 ] ==========\033[0m"
@@ -262,14 +259,12 @@ EOF
     chmod +x /usr/local/bin/V2bX_daemon.sh
     (crontab -l 2>/dev/null | grep -v "V2bX_daemon"; echo "* * * * * /bin/bash /usr/local/bin/V2bX_daemon.sh >/dev/null 2>&1") | crontab -
     echo -e "${green}自动化智能自愈守护开启成功！${plain}"
-    sleep 1.5
 }
 
 stop_daemon() {
     crontab -l 2>/dev/null | grep -v "V2bX_daemon" | crontab -
     rm -f /usr/local/bin/V2bX_daemon.sh
     echo -e "${yellow}自动化智能自愈守护已完全关闭。${plain}"
-    sleep 1.5
 }
 view_vps_info() {
     clear
@@ -305,24 +300,24 @@ process_run() {
         4) start_V2bX ;;
         5) stop_V2bX ;;
         6) restart_V2bX ;;
-        7) check_status && echo -e "状态: ${green}正在运行${plain}" || echo -e "状态: ${red}未运行${plain}"; sleep 1.5 ;;
-        8) view_log; echo ""; read -rp "按回车键返回主菜单..." ;;
+        7) check_status && echo -e "状态: ${green}正在运行${plain}" || echo -e "状态: ${red}未运行${plain}" ;;
+        8) view_log ;;
         9) enable_V2bX ;;
         10) disable_V2bX ;;
         11) install_bbr ;;
-        12) echo -e "${green}v114514.14版本${plain}"; sleep 1.5 ;;
-        13) /usr/local/V2bX/V2bX x25519; echo ""; read -rp "按回车键返回主菜单..." ;;
+        12) /usr/local/V2bX/V2bX version 2>/dev/null || echo -e "${green}v114514.14版本${plain}" ;;
+        13) /usr/local/V2bX/V2bX x25519 ;;
         14) update_shell ;;
-        15) /usr/local/V2bX/V2bX generate; echo ""; read -rp "按回车键返回主菜单..." ;;
-        16) run_clean_script; echo ""; read -rp "按回车键返回主菜单..." ;;
+        15) /usr/local/V2bX/V2bX generate ;;
+        16) run_clean_script ;;
         17) open_ports ;;
         18) exit 0 ;;
-        19) run_network_test; echo ""; read -rp "按回车键返回主菜单..." ;;
-        20) run_deep_log_clean; echo ""; read -rp "按回车键返回主菜单..." ;;
+        19) run_network_test ;;
+        20) run_deep_log_clean ;;
         21) start_daemon ;;
         22) stop_daemon ;;
-        23) view_vps_info; echo ""; read -rp "按回车键返回主菜单..." ;;
-        *) echo -e "${red}请输入正确的数字 [0-23]${plain}"; sleep 1.5 ;;
+        23) view_vps_info ;;
+        *) echo -e "${red}请输入正确的数字 [0-23]${plain}" ;;
     esac
 }
 
@@ -333,7 +328,7 @@ if [[ $# -gt 0 ]]; then
         "enable") enable_V2bX ;; "disable") disable_V2bX ;; "log") view_log ;; "clean") run_clean_script ;;
         "x25519") /usr/local/V2bX/V2bX x25519 ;; "generate") /usr/local/V2bX/V2bX generate ;;
         "daemon_on") start_daemon ;; "daemon_off") stop_daemon ;; "vps") view_vps_info ;;
-        "version") echo -e "${green}v114514.14版本${plain}" ;;
+        "version") /usr/local/V2bX/V2bX version 2>/dev/null || echo -e "${green}v114514.14版本${plain}" ;;
         "update") wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai "$2" ;;
         "install") wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
         "uninstall") rm -rf /usr/local/V2bX /etc/V2bX /usr/bin/V2bX /usr/bin/v2bx && echo "已完全卸载" ;;
@@ -341,6 +336,6 @@ if [[ $# -gt 0 ]]; then
     esac
 else
     while true; do
-        show_menu; process_run;
+        show_menu; process_run; echo ""; read -rp "按回车键返回主菜单..."
     done
 fi
