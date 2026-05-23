@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 麦卖云 V2bX 终极超神维护脚本
-sh_ver="1.2.0"
+# 麦卖云 V2bX 后端终极全能王牌脚本
+sh_ver="1.3.0"
 filepath=$(readlink -f "$0")
 
 red='\033[0;31m'
@@ -15,8 +15,6 @@ plain='\033[0m'
 # 极轻量判定小鸡环境
 if cat /etc/issue 2>/dev/null | grep -Eqi "alpine" || cat /proc/version 2>/dev/null | grep -Eqi "alpine"; then
     release="alpine"
-else
-    release="standard"
 fi
 
 show_status() {
@@ -30,23 +28,24 @@ show_status() {
         else
             echo -e "V2bX 状态: ${red}未运行${plain}"
         fi
-        echo -e "是否开机自启: ${green}是 (OpenRC)${plain}"
     else
         if systemctl is-active --quiet V2bX; then
             echo -e "V2bX 状态: ${green}已运行${plain}"
         else
             echo -e "V2bX 状态: ${red}未运行${plain}"
         fi
-        if systemctl is-enabled --quiet V2bX 2>/dev/null; then
-            echo -e "是否开机自启: ${green}是${plain}"
-        else
-            echo -e "是否开机自启: ${red}否${plain}"
-        fi
+    fi
+    
+    # 检测守护任务状态
+    if crontab -l 2>/dev/null | grep -q "V2bX_daemon"; then
+        echo -e "自动化守护: ${green}已开启 (每分钟智能自愈)${plain}"
+    else
+        echo -e "自动化守护: ${red}已关闭${plain}"
     fi
 }
 show_menu() {
     clear
-    echo -e "  ${green}麦卖云 V2bX 后端全能终极脚本${plain} (NAT/LXC 深度榨干版)"
+    echo -e "  ${green}麦卖云 V2bX 后端全能王牌脚本${plain} (NAT/LXC 终极守护版)"
     echo -e "--- ${green}https://github.com/yunfeibuzai/-.${plain} ---"
     echo -e "  ${green}0.${plain} 修改配置 (智能调用精简编辑器)"
     echo -e "————————————————"
@@ -64,9 +63,12 @@ show_menu() {
     echo -e "  ${green}17.${plain} 放行 VPS 的所有网络端口 (iptables 净化)"
     echo -e "  ${green}18.${plain} 彻底退出脚本"
     echo -e "————————————————"
-    echo -e "  ${magenta}[新核心快捷功能群]${plain}"
+    echo -e "  ${magenta}[专属高可用核心快捷功能群]${plain}"
     echo -e "  ${green}19.${plain} 小鸡网络延迟与流媒体丢包极速测试"
     echo -e "  ${green}20.${plain} 强制清空系统死锁大日志与残留垃圾缓存"
+    echo -e "  ${green}21.${plain} 🟢 开启 自动化守护 (死机自动秒拉起)"
+    echo -e "  ${green}22.${plain} 🔴 关闭 自动化守护"
+    echo -e "  ${green}23.${plain} 🔍 查看当前小鸡所有硬件信息看板"
     echo -e "————————————————"
     show_status
 }
@@ -89,7 +91,6 @@ start_V2bX() {
 
 stop_V2bX() {
     if [[ x"${release}" == x"alpine" ]]; then service V2bX stop >/dev/null 2>&1; else systemctl stop V2bX >/dev/null 2>&1; fi
-    # 额外加入 NAT 守卫：强杀残留的孤儿进程，释放小鸡内存
     pidof V2bX | xargs kill -9 >/dev/null 2>&1
     echo -e "${green}V2bX 已彻底停止并释放残余内存${plain}"
 }
@@ -139,9 +140,9 @@ update_shell() {
 open_ports() {
     if command -v iptables &>/dev/null; then
         iptables -P INPUT ACCEPT && iptables -P FORWARD ACCEPT && iptables -P OUTPUT ACCEPT && iptables -F
-        echo -e "${green}已成功净化并放行 VPS 的所有网络端口 (iptables)${plain}"
+        echo -e "${green}已成功放行 VPS 的所有网络端口 (iptables)${plain}"
     else
-        echo -e "${yellow}未检测到 iptables，可能已被精简，跳过配置${plain}"
+        echo -e "${yellow}未检测到 iptables，跳过配置${plain}"
     fi
 }
 run_clean_script() {
@@ -233,27 +234,79 @@ run_network_test() {
 run_deep_log_clean() {
     clear
     echo -e "${red}========== 强制爆破系统死锁大日志与垃圾缓存 ==========${plain}"
-    echo -e "${yellow}[警告] 正在深度清洗系统空间以防 NAT 小鸡因磁盘爆满死机...${plain}"
     
-    # 1. 爆破截断 /var/log 下的所有常规文本日志
     find /var/log -type f -regex '.*\.log' -or -regex '.*err' -or -regex '.*messages' 2>/dev/null | while read -r logfile; do
         size=$(du -h "$logfile" 2>/dev/null | awk '{print $1}')
         cat /dev/null > "$logfile" 2>/dev/null && echo "已爆破释放系统日志: $logfile ($size)"
     done
     
-    # 2. 清理 systemd 长期累积的日志文件 (Alpine跳过)
     if [ "$release" != "alpine" ] && command -v journalctl &>/dev/null; then
-        echo "正在截断并限制 systemctl 历史日志大小至 10M..."
         journalctl --vacuum-size=10M >/dev/null 2>&1
     fi
-    
-    # 3. 强制释放系统级虚拟内存页缓存 (PageCache, dentries, inodes)
     sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+    echo -e "${green}[成功] 空间大爆破完成！${plain}"
+}
+# 开启守护逻辑
+start_daemon() {
+    # 写入专属极轻量化守护自愈脚本
+    cat << 'EOF' > /usr/local/bin/V2bX_daemon.sh
+#!/bin/bash
+if [ -f /usr/local/V2bX/V2bX ]; then
+    if cat /proc/version 2>/dev/null | grep -Eqi "alpine"; then
+        service V2bX status 2>&1 | grep -Eqi "started|running" || [ -f /run/V2bX.pid ] || service V2bX start
+    else
+        systemctl is-active --quiet V2bX || systemctl start V2bX
+    fi
+fi
+EOF
+    chmod +x /usr/local/bin/V2bX_daemon.sh
     
-    echo -e "${green}[成功] 空间大爆破完成！小鸡已恢复最干净、空旷的运转状态。${plain}"
+    # 写入定时任务(每分钟执行一次)
+    (crontab -l 2>/dev/null | grep -v "V2bX_daemon"; echo "* * * * * /bin/bash /usr/local/bin/V2bX_daemon.sh >/dev/null 2>&1") | crontab -
+    echo -e "${green}自动化智能自愈守护开启成功！后端由于内存不足意外挂掉时，将在1分钟内自动拉起自愈！${plain}"
+}
+
+# 关闭守护逻辑
+stop_daemon() {
+    crontab -l 2>/dev/null | grep -v "V2bX_daemon" | crontab -
+    rm -f /usr/local/bin/V2bX_daemon.sh
+    echo -e "${yellow}自动化智能自愈守护已完全关闭。${plain}"
+}
+view_vps_info() {
+    clear
+    echo -e "${cyan}========== 麦卖云小鸡硬件环境全能看板 ==========${plain}"
+    
+    # 1. 架构与内核
+    echo -n "系统内核: " && uname -r
+    echo -n "虚拟化架构: "
+    if command -v systemd-detect-virt &>/dev/null; then
+        systemd-detect-virt
+    else
+        if [ -d /proc/vz ]; then echo "OpenVZ"; elif grep -q lxc /proc/1/environ 2>/dev/null; then echo "LXC"; else echo "KVM/Other"; fi
+    fi
+    
+    # 2. CPU负载
+    echo -n "系统总负载: " && awk '{print $1,$2,$3}' /proc/loadavg
+    
+    # 3. 磁盘剩余空间 (精炼展示)
+    echo -e "\n${yellow}[磁盘各个分区剩余空余]${plain}"
+    df -h | grep -E '^/dev/|/sd|/vd|pve|root' || df -h | head -n 4
+    
+    # 4. 网络层公网IP及地理位置信息检测
+    echo -e "\n${yellow}[小鸡网络出网IP与归属地]${plain}"
+    ip_info=$(curl -s --connect-timeout 5 https://ipapi.co/json/ 2>/dev/null)
+    if [ -n "$ip_info" ]; then
+        echo "公网 IP: $(echo "$ip_info" | awk -F'"ip": "' '{print $2}' | awk -F'"' '{print $1}')"
+        echo "国家/城市: $(echo "$ip_info" | awk -F'"country_name": "' '{print $2}' | awk -F'"' '{print $1}') - $(echo "$ip_info" | awk -F'"city": "' '{print $2}' | awk -F'"' '{print $1}')"
+        echo "运营商(ISP): $(echo "$ip_info" | awk -F'"org": "' '{print $2}' | awk -F'"' '{print $1}')"
+    else
+        # 备用轻量解析接口
+        curl -s --connect-timeout 4 ip.sb || echo "无法获取，可能为纯IPv6或小鸡DNS解析失败"
+    fi
+    echo -e "${cyan}================================================${plain}"
 }
 process_run() {
-    read -rp "请输入选择 [0-20]: " num
+    read -rp "请输入选择 [0-23]: " num
     case "$num" in
         0) edit_config ;;
         1) wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
@@ -276,7 +329,10 @@ process_run() {
         18) exit 0 ;;
         19) run_network_test ;;
         20) run_deep_log_clean ;;
-        *) echo -e "${red}请输入正确的数字 [0-20]${plain}" ;;
+        21) start_daemon ;;
+        22) stop_daemon ;;
+        23) view_vps_info ;;
+        *) echo -e "${red}请输入正确的数字 [0-23]${plain}" ;;
     esac
 }
 
@@ -286,10 +342,10 @@ if [[ $# -gt 0 ]]; then
         "status") check_status && echo -e "状态: ${green}正在运行${plain}" || echo -e "状态: ${red}未运行${plain}" ;;
         "enable") enable_V2bX ;; "disable") disable_V2bX ;; "log") view_log ;; "clean") run_clean_script ;;
         "x25519") /usr/local/V2bX/V2bX x25519 ;; "generate") /usr/local/V2bX/V2bX generate ;;
+        "daemon_on") start_daemon ;; "daemon_off") stop_daemon ;; "vps") view_vps_info ;;
         "update") wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai "$2" ;;
         "install") wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
         "uninstall") rm -rf /usr/local/V2bX /etc/V2bX /usr/bin/V2bX /usr/bin/v2bx && echo "已完全卸载" ;;
-        "version") /usr/local/V2bX/V2bX version 2>/dev/null || echo "未知版本" ;;
         *) show_menu; process_run ;;
     esac
 else
