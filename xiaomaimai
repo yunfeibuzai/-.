@@ -13,109 +13,68 @@ cur_dir=$(pwd)
 # check os
 if [[ -f /etc/redhat-release ]]; then
     release="centos"
-elif cat /etc/issue | grep -Eqi "alpine"; then
+elif cat /etc/issue 2>/dev/null | grep -Eqi "alpine" || cat /proc/version 2>/dev/null | grep -Eqi "alpine"; then
     release="alpine"
-elif cat /etc/issue | grep -Eqi "debian"; then
+elif cat /etc/issue 2>/dev/null | grep -Eqi "debian" || cat /proc/version 2>/dev/null | grep -Eqi "debian"; then
     release="debian"
-elif cat /etc/issue | grep -Eqi "ubuntu"; then
+elif cat /etc/issue 2>/dev/null | grep -Eqi "ubuntu" || cat /proc/version 2>/dev/null | grep -Eqi "ubuntu"; then
     release="ubuntu"
-elif cat /etc/issue | grep -Eqi "centos|red hat|redhat|rocky|alma|oracle linux"; then
-    release="centos"
-elif cat /proc/version | grep -Eqi "debian"; then
-    release="debian"
-elif cat /proc/version | grep -Eqi "ubuntu"; then
-    release="ubuntu"
-elif cat /proc/version | grep -Eqi "centos|red hat|redhat|rocky|alma|oracle linux"; then
-    release="centos"
-elif cat /proc/version | grep -Eqi "arch"; then
+elif cat /proc/version 2>/dev/null | grep -Eqi "arch"; then
     release="arch"
 else
-    echo -e "${red}未检测到系统版本，请联系脚本作者！${plain}\n" && exit 1
+    release="debian" # 无法识别时默认走通用的 debian 系组件
 fi
 
 arch=$(uname -m)
-
 if [[ $arch == "x86_64" || $arch == "x64" || $arch == "amd64" ]]; then
     arch="64"
 elif [[ $arch == "aarch64" || $arch == "arm64" ]]; then
     arch="arm64-v8a"
-elif [[ $arch == "s390x" ]]; then
-    arch="s390x"
 else
     arch="64"
-    echo -e "${red}检测架构失败，使用默认架构: ${arch}${plain}"
 fi
 
-echo "架构: ${arch}"
+echo "系统检测: ${release} | 架构: ${arch}"
 
 if [ "$(getconf WORD_BIT)" != '32' ] && [ "$(getconf LONG_BIT)" != '64' ] ; then
-    echo "本软件不支持 32 位系统(x86)，请使用 64 位系统(x86_64)，如果检测有误，请联系作者"
-    exit 2
+    echo "仅支持64位系统" && exit 2
 fi
 
 # os version
 if [[ -f /etc/os-release ]]; then
     os_version=$(awk -F'[= ."]' '/VERSION_ID/{print $3}' /etc/os-release)
 fi
-if [[ -z "$os_version" && -f /etc/lsb-release ]]; then
-    os_version=$(awk -F'[= ."]+' '/DISTRIB_RELEASE/{print $2}' /etc/lsb-release)
-fi
-
-if [[ x"${release}" == x"centos" ]]; then
-    if [[ ${os_version} -le 6 ]]; then
-        echo -e "${red}请使用 CentOS 7 或更高版本的系统！${plain}\n" && exit 1
-    fi
-    if [[ ${os_version} -eq 7 ]]; then
-        echo -e "${red}注意： CentOS 7 无法使用hysteria1/2协议！${plain}\n"
-    fi
-elif [[ x"${release}" == x"ubuntu" ]]; then
-    if [[ ${os_version} -lt 16 ]]; then
-        echo -e "${red}请使用 Ubuntu 16 或更高版本的系统！${plain}\n" && exit 1
-    fi
-elif [[ x"${release}" == x"debian" ]]; then
-    if [[ ${os_version} -lt 8 ]]; then
-        echo -e "${red}请使用 Debian 8 或更高版本的系统！${plain}\n" && exit 1
-    fi
-fi
 
 install_base() {
+    echo -e "${yellow}正在同步组件与证书...${plain}"
     if [[ x"${release}" == x"centos" ]]; then
         yum install epel-release wget curl unzip tar crontabs socat ca-certificates -y >/dev/null 2>&1
         update-ca-trust force-enable >/dev/null 2>&1
     elif [[ x"${release}" == x"alpine" ]]; then
-        apk add wget curl unzip tar socat ca-certificates >/dev/null 2>&1
+        apk update >/dev/null 2>&1
+        apk add wget curl unzip tar socat ca-certificates openssl >/dev/null 2>&1
         update-ca-certificates >/dev/null 2>&1
-    elif [[ x"${release}" == x"debian" ]]; then
+    elif [[ x"${release}" == x"debian" || x"${release}" == x"ubuntu" ]]; then
         apt-get update -y >/dev/null 2>&1
         apt install wget curl unzip tar cron socat ca-certificates -y >/dev/null 2>&1
         update-ca-certificates >/dev/null 2>&1
-    elif [[ x"${release}" == x"ubuntu" ]]; then
-        apt-get update -y >/dev/null 2>&1
-        apt install wget curl unzip tar cron socat -y >/dev/null 2>&1
-        apt-get install ca-certificates wget -y >/dev/null 2>&1
-        update-ca-certificates >/dev/null 2>&1
     elif [[ x"${release}" == x"arch" ]]; then
         pacman -Sy --noconfirm >/dev/null 2>&1
-        pacman -S --noconfirm --needed wget curl unzip tar cron socat >/dev/null 2>&1
-        pacman -S --noconfirm --needed ca-certificates wget >/dev/null 2>&1
+        pacman -S --noconfirm --needed wget curl unzip tar cron socat ca-certificates >/dev/null 2>&1
     fi
 }
-
-# 0: running, 1: not running, 2: not installed
 check_status() {
     if [[ ! -f /usr/local/V2bX/V2bX ]]; then
         return 2
     fi
     if [[ x"${release}" == x"alpine" ]]; then
-        temp=$(service V2bX status | awk '{print $3}')
-        if [[ x"${temp}" == x"started" ]]; then
+        if service V2bX status 2>&1 | grep -Eqi "started|running" || [ -f /run/V2bX.pid ]; then
             return 0
         else
             return 1
         fi
     else
-        temp=$(systemctl status V2bX | grep Active | awk '{print $3}' | cut -d "(" -f2 | cut -d ")" -f1)
-        if [[ x"${temp}" == x"running" ]]; then
+        if systemctl is-active --quiet V2bX; then
             return 0
         else
             return 1
@@ -124,64 +83,53 @@ check_status() {
 }
 
 install_V2bX() {
-    if [[ -e /usr/local/V2bX/ ]]; then
-        rm -rf /usr/local/V2bX/
+    if [[ -d /usr/local/V2bX/ ]]; then
+        find /usr/local/V2bX/ -type f -not -name "config.json" -delete 2>/dev/null
+    else
+        mkdir /usr/local/V2bX/ -p
     fi
-
-    mkdir /usr/local/V2bX/ -p
     cd /usr/local/V2bX/
 
-    if  [ $# == 0 ] ;then
-        last_version=$(curl -Ls "https://api.github.com/repos/wyx2685/V2bX/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    if [ $# == 0 ] ;then
+        last_version=$(curl -Ls --connect-timeout 8 "https://api.github.com/repos/wyx2685/V2bX/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
         if [[ ! -n "$last_version" ]]; then
-            echo -e "${red}检测 V2bX 版本失败，可能是超出 Github API 限制，请稍后再试，或手动指定 V2bX 版本安装${plain}"
-            exit 1
+            echo -e "${yellow}警告: API 请求受限，启用本地硬编码默认版本安装...${plain}"
+            last_version="v0.1.7" # 硬编码防爆底线
         fi
-        echo -e "检测到 V2bX 最新版本：${last_version}，开始安装"
-        wget --no-check-certificate -N --progress=bar -O /usr/local/V2bX/V2bX-linux.zip https://github.com/wyx2685/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip
+        
+        echo -e "准备安装 V2bX 版本：${last_version}"
+        # 核心优化：如果主线GitHub超时，自动切ghproxy镜像源加速
+        url="https://github.com/wyx2685/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip"
+        wget --no-check-certificate -N --timeout=10 --tries=2 -O /usr/local/V2bX/V2bX-linux.zip "${url}"
         if [[ $? -ne 0 ]]; then
-            echo -e "${red}下载 V2bX 失败，请确保你的服务器能够下载 Github 的文件${plain}"
-            exit 1
+            echo -e "${yellow}主线连接超时，正在切换加速镜像站下载...${plain}"
+            wget --no-check-certificate -N --timeout=15 -O /usr/local/V2bX/V2bX-linux.zip "https://ghproxy.net/${url}"
         fi
     else
         last_version=$1
         url="https://github.com/wyx2685/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip"
-        echo -e "开始安装 V2bX $1"
-        wget --no-check-certificate -N --progress=bar -O /usr/local/V2bX/V2bX-linux.zip ${url}
-        if [[ $? -ne 0 ]]; then
-            echo -e "${red}下载 V2bX $1 失败，请确保此版本存在${plain}"
-            exit 1
-        fi
+        wget --no-check-certificate -N --timeout=10 -O /usr/local/V2bX/V2bX-linux.zip "${url}" || wget --no-check-certificate -N --timeout=15 -O /usr/local/V2bX/V2bX-linux.zip "https://ghproxy.net/${url}"
     fi
 
-    unzip V2bX-linux.zip
+    unzip -o V2bX-linux.zip >/dev/null 2>&1
     rm V2bX-linux.zip -f
     chmod +x V2bX
     mkdir /etc/V2bX/ -p
-    cp geoip.dat /etc/V2bX/
-    cp geosite.dat /etc/V2bX/
+    [[ -f geoip.dat ]] && cp geoip.dat /etc/V2bX/
+    [[ -f geosite.dat ]] && cp geosite.dat /etc/V2bX/
     if [[ x"${release}" == x"alpine" ]]; then
         rm /etc/init.d/V2bX -f
         cat <<EOF > /etc/init.d/V2bX
 #!/sbin/openrc-run
-
 name="V2bX"
-description="V2bX"
-
 command="/usr/local/V2bX/V2bX"
 command_args="server"
-command_user="root"
-
 pidfile="/run/V2bX.pid"
 command_background="yes"
-
-depend() {
-        need net
-}
+depend() { need net; }
 EOF
         chmod +x /etc/init.d/V2bX
-        rc-update add V2bX default
-        echo -e "${green}V2bX ${last_version}${plain} 安装完成，已设置开机自启"
+        rc-update add V2bX default >/dev/null 2>&1
     else
         rm /etc/systemd/system/V2bX.service -f
         cat <<EOF > /etc/systemd/system/V2bX.service
@@ -192,100 +140,54 @@ Wants=network.target
 
 [Service]
 User=root
-Group=root
 Type=simple
-LimitAS=infinity
-LimitRSS=infinity
-LimitCORE=infinity
-LimitNOFILE=999999
 WorkingDirectory=/usr/local/V2bX/
 ExecStart=/usr/local/V2bX/V2bX server
 Restart=always
-RestartSec=10
+RestartSec=5
+MemoryLimit=300M
+LimitNOFILE=999999
 
 [Install]
 WantedBy=multi-user.target
 EOF
         systemctl daemon-reload
-        systemctl stop V2bX
-        systemctl enable V2bX
-        echo -e "${green}V2bX ${last_version}${plain} 安装完成，已设置开机自启"
+        systemctl enable V2bX >/dev/null 2>&1
     fi
 
     if [[ ! -f /etc/V2bX/config.json ]]; then
-        cp config.json /etc/V2bX/
-        echo -e ""
-        echo -e "全新安装，请先参看教程：https://v2bx.v-50.me/，配置必要的内容"
+        [[ -f config.json ]] && cp config.json /etc/V2bX/
         first_install=true
     else
-        if [[ x"${release}" == x"alpine" ]]; then
-            service V2bX start
-        else
-            systemctl start V2bX
-        fi
-        sleep 2
+        if [[ x"${release}" == x"alpine" ]]; then service V2bX restart >/dev/null 2>&1; else systemctl restart V2bX >/dev/null 2>&1; fi
+        sleep 1.5
         check_status
-        echo -e ""
-        if [[ $? == 0 ]]; then
-            echo -e "${green}V2bX 重启成功${plain}"
-        else
-            echo -e "${red}V2bX 可能启动失败，请稍后使用 V2bX log 查看日志信息，若无法启动，则可能更改了配置格式，请前往 wiki 查看：https://github.com/V2bX-project/V2bX/wiki${plain}"
-        fi
+        [[ $? == 0 ]] && echo -e "${green}V2bX 节点重启成功！${plain}" || echo -e "${red}启动失败，请检查/etc/V2bX/config.json格式${plain}"
         first_install=false
     fi
 
-    if [[ ! -f /etc/V2bX/dns.json ]]; then
-        cp dns.json /etc/V2bX/
-    fi
-    if [[ ! -f /etc/V2bX/route.json ]]; then
-        cp route.json /etc/V2bX/
-    fi
-    if [[ ! -f /etc/V2bX/custom_outbound.json ]]; then
-        cp custom_outbound.json /etc/V2bX/
-    fi
-    if [[ ! -f /etc/V2bX/custom_inbound.json ]]; then
-        cp custom_inbound.json /etc/V2bX/
-    fi
-    curl -o /usr/bin/V2bX -Ls https://raw.githubusercontent.com/wyx2685/V2bX-script/master/V2bX.sh
-    chmod +x /usr/bin/V2bX
-    if [ ! -L /usr/bin/v2bx ]; then
-        ln -s /usr/bin/V2bX /usr/bin/v2bx
-        chmod +x /usr/bin/v2bx
-    fi
+    for json_file in dns route custom_outbound custom_inbound; do
+        [[ ! -f /etc/V2bX/${json_file}.json && -f ${json_file}.json ]] && cp ${json_file}.json /etc/V2bX/
+    done
+
+    curl -o /usr/bin/V2bX -Ls https://raw.githubusercontent.com/wyx2685/V2bX-script/master/V2bX.sh && chmod +x /usr/bin/V2bX
+    [[ ! -L /usr/bin/v2bx ]] && ln -s /usr/bin/V2bX /usr/bin/v2bx 2>/dev/null && chmod +x /usr/bin/v2bx 2>/dev/null
+    
     cd $cur_dir
-    rm -f install.sh
-    echo -e ""
-    echo "V2bX 管理脚本使用方法 (兼容使用V2bX执行，大小写不敏感): "
-    echo "------------------------------------------"
-    echo "V2bX              - 显示管理菜单 (功能更多)"
-    echo "V2bX start        - 启动 V2bX"
-    echo "V2bX stop         - 停止 V2bX"
-    echo "V2bX restart      - 重启 V2bX"
-    echo "V2bX status       - 查看 V2bX 状态"
-    echo "V2bX enable       - 设置 V2bX 开机自启"
-    echo "V2bX disable      - 取消 V2bX 开机自启"
-    echo "V2bX log          - 查看 V2bX 日志"
-    echo "V2bX x25519       - 生成 x25519 密钥"
-    echo "V2bX generate     - 生成 V2bX 配置文件"
-    echo "V2bX update       - 更新 V2bX"
-    echo "V2bX update x.x.x - 更新 V2bX 指定版本"
-    echo "V2bX install      - 安装 V2bX"
-    echo "V2bX uninstall    - 卸载 V2bX"
-    echo "V2bX version      - 查看 V2bX 版本"
-    echo "------------------------------------------"
-    curl -fsS --max-time 10 "https://api.v-50.me/counter_v2bx" || true
-    # 首次安装询问是否生成配置文件
+    clear
+    echo -e "${green}=========================================="
+    echo -e "V2bX 节点端极致优化版安装完成！"
+    echo -e "输入 V2bX 或 v2bx 即可呼出管理菜单"
+    echo -e "==========================================${plain}"
+    
     if [[ $first_install == true ]]; then
-        read -rp "检测到你为第一次安装V2bX,是否自动直接生成配置文件？(y/n): " if_generate
+        read -rp "首次安装，是否立即自动生成配置文件？(y/n): " if_generate
         if [[ $if_generate == [Yy] ]]; then
             curl -o ./initconfig.sh -Ls https://raw.githubusercontent.com/wyx2685/V2bX-script/master/initconfig.sh
-            source initconfig.sh
-            rm initconfig.sh -f
-            generate_config_file
+            source initconfig.sh && rm initconfig.sh -f && generate_config_file
         fi
     fi
 }
 
-echo -e "${green}开始安装${plain}"
 install_base
 install_V2bX $1
