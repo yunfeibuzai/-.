@@ -309,58 +309,48 @@ process_run() {
     read -rp "请输入选择 [0-23]: " num
     case "$num" in
         0) edit_config ;;
-        1) install_v2bx ;; # 核心变更：调用真正的安装程序
-        2) update_v2bx ;;  # 核心变更：调用真正的更新程序
-        3) stop_V2bX && rm -rf /usr/local/V2bX /etc/V2bX /usr/bin/V2bX && echo -e "${green}卸载完成${plain}" ;;
+        1) wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
+        2) wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
+        3) rm -rf /usr/local/V2bX /etc/V2bX /usr/bin/V2bX /usr/bin/v2bx && echo "已完全卸载" ;;
         4) start_V2bX ;;
         5) stop_V2bX ;;
         6) restart_V2bX ;;
-        7) check_status ;;
+        7) check_status && echo -e "状态: ${green}正在运行${plain}" || echo -e "状态: ${red}未运行${plain}" ;;
         8) view_log ;;
         9) enable_V2bX ;;
         10) disable_V2bX ;;
         11) install_bbr ;;
-        12) /usr/local/V2bX/V2bX version 2>/dev/null || echo "未检测到安装" ;;
+        12) /usr/local/V2bX/V2bX version 2>/dev/null || echo -e "${green}v114514.14版本${plain}" ;;
         13) /usr/local/V2bX/V2bX x25519 ;;
         14) update_shell ;;
         15) /usr/local/V2bX/V2bX generate ;;
         16) run_clean_script ;;
         17) open_ports ;;
         18) exit 0 ;;
-        *) echo -e "${red}无效选择${plain}" ;;
+        19) run_network_test ;;
+        20) run_deep_log_clean ;;
+        21) start_daemon ;;
+        22) stop_daemon ;;
+        23) view_vps_info ;;
+        *) echo -e "${red}请输入正确的数字 [0-23]${plain}" ;;
     esac
 }
-install_v2bx() {
-    echo -e "${yellow}正在从官方源下载 V2bX 核心...${plain}"
-    mkdir -p /usr/local/V2bX
-    # 获取最新 release 版本并下载
-    latest_ver=$(curl -s https://api.github.com/repos/wyx2685/V2bX/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-    wget -O /usr/local/V2bX/V2bX "https://github.com/wyx2685/V2bX/releases/download/${latest_ver}/V2bX-linux-amd64"
-    chmod +x /usr/local/V2bX/V2bX
-    
-    # 写入 systemd 守护服务
-    cat << EOF > /etc/systemd/system/V2bX.service
-[Unit]
-Description=V2bX Service
-After=network.target
 
-[Service]
-ExecStart=/usr/local/V2bX/V2bX
-Restart=always
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    systemctl daemon-reload
-    systemctl enable V2bX
-    echo -e "${green}V2bX 安装成功！请使用 0 选项编辑配置文件。${plain}"
-}
-
-update_v2bx() {
-    echo -e "${yellow}正在检查更新...${plain}"
-    stop_V2bX
-    install_v2bx
-    start_V2bX
-    echo -e "${green}更新完成！${plain}"
-}
+if [[ $# -gt 0 ]]; then
+    case "$1" in
+        "start") start_V2bX ;; "stop") stop_V2bX ;; "restart") restart_V2bX ;;
+        "status") check_status && echo -e "状态: ${green}正在运行${plain}" || echo -e "状态: ${red}未运行${plain}" ;;
+        "enable") enable_V2bX ;; "disable") disable_V2bX ;; "log") view_log ;; "clean") run_clean_script ;;
+        "x25519") /usr/local/V2bX/V2bX x25519 ;; "generate") /usr/local/V2bX/V2bX generate ;;
+        "daemon_on") start_daemon ;; "daemon_off") stop_daemon ;; "vps") view_vps_info ;;
+        "version") /usr/local/V2bX/V2bX version 2>/dev/null || echo -e "${green}v114514.14版本${plain}" ;;
+        "update") wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai "$2" ;;
+        "install") wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
+        "uninstall") rm -rf /usr/local/V2bX /etc/V2bX /usr/bin/V2bX /usr/bin/v2bx && echo "已完全卸载" ;;
+        *) show_menu; process_run ;;
+    esac
+else
+    while true; do
+        show_menu; process_run; echo ""; read -rp "按回车键返回主菜单..."
+    done
+fi
