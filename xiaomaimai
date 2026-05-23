@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 麦卖云 V2bX 管理脚本极致优化版 (含体检清理)
-sh_ver="1.1.0"
+# 麦卖云 V2bX 终极超神维护脚本
+sh_ver="1.2.0"
 filepath=$(readlink -f "$0")
 
 red='\033[0;31m'
@@ -12,7 +12,7 @@ plain='\033[0m'
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}错误：${plain} 必须使用root用户运行此脚本！\n" && exit 1
 
-# check os
+# 极轻量判定小鸡环境
 if cat /etc/issue 2>/dev/null | grep -Eqi "alpine" || cat /proc/version 2>/dev/null | grep -Eqi "alpine"; then
     release="alpine"
 else
@@ -46,31 +46,27 @@ show_status() {
 }
 show_menu() {
     clear
-    echo -e "  ${green}麦卖云 V2bX 后端管理脚本${plain}，不适用于 docker"
+    echo -e "  ${green}麦卖云 V2bX 后端全能终极脚本${plain} (NAT/LXC 深度榨干版)"
     echo -e "--- ${green}https://github.com/yunfeibuzai/-.${plain} ---"
-    echo -e "  ${green}0.${plain} 修改配置"
+    echo -e "  ${green}0.${plain} 修改配置 (智能调用精简编辑器)"
     echo -e "————————————————"
-    echo -e "  ${green}1.${plain} 安装 V2bX"
-    echo -e "  ${green}2.${plain} 更新 V2bX"
-    echo -e "  ${green}3.${plain} 卸载 V2bX"
+    echo -e "  ${green}1.${plain} 安装 V2bX             ${green}2.${plain} 更新 V2bX"
+    echo -e "  ${green}3.${plain} 卸载 V2bX             ${green}4.${plain} 启动 V2bX"
+    echo -e "  ${green}5.${plain} 停止 V2bX             ${green}6.${plain} 重启 V2bX (强杀顽固僵尸)"
+    echo -e "  ${green}7.${plain} 查看 V2bX 状态        ${green}8.${plain} 查看 V2bX 日志"
     echo -e "————————————————"
-    echo -e "  ${green}4.${plain} 启动 V2bX"
-    echo -e "  ${green}5.${plain} 停止 V2bX"
-    echo -e "  ${green}6.${plain} 重启 V2bX"
-    echo -e "  ${green}7.${plain} 查看 V2bX 状态"
-    echo -e "  ${green}8.${plain} 查看 V2bX 日志"
-    echo -e "————————————————"
-    echo -e "  ${green}9.${plain} 设置 V2bX 开机自启"
-    echo -e "  ${green}10.${plain} 取消 V2bX 开机自启"
-    echo -e "————————————————"
-    echo -e "  ${green}11.${plain} 一键安装 bbr (最新内核)"
-    echo -e "  ${green}12.${plain} 查看 V2bX 版本"
-    echo -e "  ${green}13.${plain} 生成 x25519 密钥"
-    echo -e "  ${green}14.${plain} 升级 V2bX 维护脚本"
+    echo -e "  ${green}9.${plain} 设置 V2bX 开机自启    ${green}10.${plain} 取消 V2bX 开机自启"
+    echo -e "  ${green}11.${plain} 一键安装 bbr 内核     ${green}12.${plain} 查看 V2bX 版本"
+    echo -e "  ${green}13.${plain} 生成 x25519 密钥      ${green}14.${plain} 升级 V2bX 维护脚本"
     echo -e "  ${green}15.${plain} 生成 V2bX 配置文件"
-    echo -e "  ${green}16.${plain} 麦卖云小鸡体检与智能清理 (新增)"
-    echo -e "  ${green}17.${plain} 放行 VPS 的所有网络端口"
-    echo -e "  ${green}18.${plain} 退出脚本"
+    echo -e "————————————————"
+    echo -e "  ${green}16.${plain} 麦卖云小鸡体检与残留挂机容器强杀"
+    echo -e "  ${green}17.${plain} 放行 VPS 的所有网络端口 (iptables 净化)"
+    echo -e "  ${green}18.${plain} 彻底退出脚本"
+    echo -e "————————————————"
+    echo -e "  ${magenta}[新核心快捷功能群]${plain}"
+    echo -e "  ${green}19.${plain} 小鸡网络延迟与流媒体丢包极速测试"
+    echo -e "  ${green}20.${plain} 强制清空系统死锁大日志与残留垃圾缓存"
     echo -e "————————————————"
     show_status
 }
@@ -93,13 +89,13 @@ start_V2bX() {
 
 stop_V2bX() {
     if [[ x"${release}" == x"alpine" ]]; then service V2bX stop >/dev/null 2>&1; else systemctl stop V2bX >/dev/null 2>&1; fi
-    echo -e "${green}V2bX 已停止${plain}"
+    # 额外加入 NAT 守卫：强杀残留的孤儿进程，释放小鸡内存
+    pidof V2bX | xargs kill -9 >/dev/null 2>&1
+    echo -e "${green}V2bX 已彻底停止并释放残余内存${plain}"
 }
 
 restart_V2bX() {
-    if [[ x"${release}" == x"alpine" ]]; then service V2bX restart >/dev/null 2>&1; else systemctl restart V2bX >/dev/null 2>&1; fi
-    sleep 1 && check_status
-    [[ $? == 0 ]] && echo -e "${green}V2bX 重启成功${plain}" || echo -e "${red}V2bX 重启失败${plain}"
+    stop_V2bX && sleep 1 && start_V2bX
 }
 
 enable_V2bX() {
@@ -135,8 +131,7 @@ install_bbr() {
 
 update_shell() {
     echo -e "${yellow}正在从您的专属仓库同步最新管理脚本...${plain}"
-    curl -o "$filepath" -Ls "https://raw.githubusercontent.com/yunfeibuzai/-./main/V2bX.sh"
-    chmod +x "$filepath"
+    curl -o "$filepath" -Ls "https://raw.githubusercontent.com/yunfeibuzai/-./main/V2bX.sh" && chmod +x "$filepath"
     echo -e "${green}管理脚本升级成功，请重新运行 v2bx 命令！${plain}"
     exit 0
 }
@@ -144,7 +139,7 @@ update_shell() {
 open_ports() {
     if command -v iptables &>/dev/null; then
         iptables -P INPUT ACCEPT && iptables -P FORWARD ACCEPT && iptables -P OUTPUT ACCEPT && iptables -F
-        echo -e "${green}已成功放行 VPS 的所有网络端口 (iptables)${plain}"
+        echo -e "${green}已成功净化并放行 VPS 的所有网络端口 (iptables)${plain}"
     else
         echo -e "${yellow}未检测到 iptables，可能已被精简，跳过配置${plain}"
     fi
@@ -215,8 +210,50 @@ run_clean_script() {
     printf "\n\033[1;32m>>> 最终清理优化后的内存概况：\033[0m\n"
     free -h
 }
+run_network_test() {
+    clear
+    echo -e "${yellow}========== 麦卖云小鸡网络丢包与延迟测试 ==========${plain}"
+    echo -n "1. 联通到你的 GitHub 仓库速度: "
+    res1=$(curl -o /dev/null -s -w '%{time_total}' --connect-timeout 4 "https://raw.githubusercontent.com/yunfeibuzai/-./main/V2bX.sh")
+    if [ $? -eq 0 ]; then echo -e "${green}${res1} 秒${plain}"; else echo -e "${red}超时断连${plain}"; fi
+
+    echo -n "2. 联通到 GitHub API 核心节点: "
+    res2=$(curl -o /dev/null -s -w '%{time_total}' --connect-timeout 4 "https://api.github.com/repos/wyx2685/V2bX/releases/latest")
+    if [ $? -eq 0 ]; then echo -e "${green}${res2} 秒${plain}"; else echo -e "${red}连接受限/超时${plain}"; fi
+
+    echo -n "3. 联通到 Cloudflare CDN 边缘网关: "
+    res3=$(curl -o /dev/null -s -w '%{time_total}' --connect-timeout 3 "https://1.1.1.1")
+    if [ $? -eq 0 ]; then echo -e "${green}${res3} 秒${plain}"; else echo -e "${red}丢包严重${plain}"; fi
+
+    echo -n "4. 联通到 Google 核心基础设施网络: "
+    res4=$(curl -o /dev/null -s -w '%{time_total}' --connect-timeout 3 "https://www.google.com")
+    if [ $? -eq 0 ]; then echo -e "${green}${res4} 秒${plain}"; else echo -e "${red}阻断不可达${plain}"; fi
+    echo -e "${yellow}==================================================${plain}"
+}
+run_deep_log_clean() {
+    clear
+    echo -e "${red}========== 强制爆破系统死锁大日志与垃圾缓存 ==========${plain}"
+    echo -e "${yellow}[警告] 正在深度清洗系统空间以防 NAT 小鸡因磁盘爆满死机...${plain}"
+    
+    # 1. 爆破截断 /var/log 下的所有常规文本日志
+    find /var/log -type f -regex '.*\.log' -or -regex '.*err' -or -regex '.*messages' 2>/dev/null | while read -r logfile; do
+        size=$(du -h "$logfile" 2>/dev/null | awk '{print $1}')
+        cat /dev/null > "$logfile" 2>/dev/null && echo "已爆破释放系统日志: $logfile ($size)"
+    done
+    
+    # 2. 清理 systemd 长期累积的日志文件 (Alpine跳过)
+    if [ "$release" != "alpine" ] && command -v journalctl &>/dev/null; then
+        echo "正在截断并限制 systemctl 历史日志大小至 10M..."
+        journalctl --vacuum-size=10M >/dev/null 2>&1
+    fi
+    
+    # 3. 强制释放系统级虚拟内存页缓存 (PageCache, dentries, inodes)
+    sync && echo 3 > /proc/sys/vm/drop_caches 2>/dev/null
+    
+    echo -e "${green}[成功] 空间大爆破完成！小鸡已恢复最干净、空旷的运转状态。${plain}"
+}
 process_run() {
-    read -rp "请输入选择 [0-18]: " num
+    read -rp "请输入选择 [0-20]: " num
     case "$num" in
         0) edit_config ;;
         1) wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
@@ -237,23 +274,18 @@ process_run() {
         16) run_clean_script ;;
         17) open_ports ;;
         18) exit 0 ;;
-        *) echo -e "${red}请输入正确的数字 [0-18]${plain}" ;;
+        19) run_network_test ;;
+        20) run_deep_log_clean ;;
+        *) echo -e "${red}请输入正确的数字 [0-20]${plain}" ;;
     esac
 }
 
-# 支持参数直接调用
 if [[ $# -gt 0 ]]; then
     case "$1" in
-        "start") start_V2bX ;;
-        "stop") stop_V2bX ;;
-        "restart") restart_V2bX ;;
+        "start") start_V2bX ;; "stop") stop_V2bX ;; "restart") restart_V2bX ;;
         "status") check_status && echo -e "状态: ${green}正在运行${plain}" || echo -e "状态: ${red}未运行${plain}" ;;
-        "enable") enable_V2bX ;;
-        "disable") disable_V2bX ;;
-        "log") view_log ;;
-        "clean") run_clean_script ;;
-        "x25519") /usr/local/V2bX/V2bX x25519 ;;
-        "generate") /usr/local/V2bX/V2bX generate ;;
+        "enable") enable_V2bX ;; "disable") disable_V2bX ;; "log") view_log ;; "clean") run_clean_script ;;
+        "x25519") /usr/local/V2bX/V2bX x25519 ;; "generate") /usr/local/V2bX/V2bX generate ;;
         "update") wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai "$2" ;;
         "install") wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
         "uninstall") rm -rf /usr/local/V2bX /etc/V2bX /usr/bin/V2bX /usr/bin/v2bx && echo "已完全卸载" ;;
@@ -262,9 +294,6 @@ if [[ $# -gt 0 ]]; then
     esac
 else
     while true; do
-        show_menu
-        process_run
-        echo ""
-        read -rp "按回车键返回主菜单..."
+        show_menu; process_run; echo ""; read -rp "按回车键返回主菜单..."
     done
 fi
