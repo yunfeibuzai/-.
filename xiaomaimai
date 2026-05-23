@@ -309,8 +309,32 @@ process_run() {
     read -rp "请输入选择 [0-23]: " num
     case "$num" in
         0) edit_config ;;
-        1) wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
-        2) wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai && bash xiaomaimai ;;
+        1) 
+            echo -e "${yellow}正在拉取底层核心安装包 xiaomaimai...${plain}"
+            rm -f xiaomaimai
+            wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai
+            if [ -f xiaomaimai ]; then
+                echo -e "${green}拉取成功，开始执行对接安装...${plain}"
+                chmod +x xiaomaimai
+                bash xiaomaimai
+            else
+                echo -e "${red}错误：核心安装脚本 xiaomaimai 下载失败！${plain}"
+                echo -e "${red}请检查此节点到 GitHub 的网络连通性，或检查 main/xiaomaimai 路径是否正确。${plain}"
+            fi
+            read -rp "核心安装程序执行完毕/已中断，按回车键才会退回主菜单..."
+            ;;
+        2) 
+            echo -e "${yellow}正在拉取核心更新包 xiaomaimai...${plain}"
+            rm -f xiaomaimai
+            wget -N https://raw.githubusercontent.com/yunfeibuzai/-./main/xiaomaimai
+            if [ -f xiaomaimai ]; then
+                chmod +x xiaomaimai
+                bash xiaomaimai
+            else
+                echo -e "${red}错误：核心更新脚本下载失败！${plain}"
+            fi
+            read -rp "核心更新程序执行完毕，按回车键退回主菜单..."
+            ;;
         3) rm -rf /usr/local/V2bX /etc/V2bX /usr/bin/V2bX /usr/bin/v2bx && echo "已完全卸载" ;;
         4) start_V2bX ;;
         5) stop_V2bX ;;
