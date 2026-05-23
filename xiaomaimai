@@ -6,6 +6,7 @@ yellow='\033[0;33m'
 plain='\033[0m'
 
 cur_dir=$(pwd)
+MY_GITHUB="https://raw.githubusercontent.com/yunfeibuzai/-./main"
 
 # check root
 [[ $EUID -ne 0 ]] && echo -e "${red}错误：${plain} 必须使用root用户运行此脚本！\n" && exit 1
@@ -19,10 +20,8 @@ elif cat /etc/issue 2>/dev/null | grep -Eqi "debian" || cat /proc/version 2>/dev
     release="debian"
 elif cat /etc/issue 2>/dev/null | grep -Eqi "ubuntu" || cat /proc/version 2>/dev/null | grep -Eqi "ubuntu"; then
     release="ubuntu"
-elif cat /proc/version 2>/dev/null | grep -Eqi "arch"; then
-    release="arch"
 else
-    release="debian" # 无法识别时默认走通用的 debian 系组件
+    release="debian"
 fi
 
 arch=$(uname -m)
@@ -32,17 +31,6 @@ elif [[ $arch == "aarch64" || $arch == "arm64" ]]; then
     arch="arm64-v8a"
 else
     arch="64"
-fi
-
-echo "系统检测: ${release} | 架构: ${arch}"
-
-if [ "$(getconf WORD_BIT)" != '32' ] && [ "$(getconf LONG_BIT)" != '64' ] ; then
-    echo "仅支持64位系统" && exit 2
-fi
-
-# os version
-if [[ -f /etc/os-release ]]; then
-    os_version=$(awk -F'[= ."]' '/VERSION_ID/{print $3}' /etc/os-release)
 fi
 
 install_base() {
@@ -58,11 +46,9 @@ install_base() {
         apt-get update -y >/dev/null 2>&1
         apt install wget curl unzip tar cron socat ca-certificates -y >/dev/null 2>&1
         update-ca-certificates >/dev/null 2>&1
-    elif [[ x"${release}" == x"arch" ]]; then
-        pacman -Sy --noconfirm >/dev/null 2>&1
-        pacman -S --noconfirm --needed wget curl unzip tar cron socat ca-certificates >/dev/null 2>&1
     fi
 }
+
 check_status() {
     if [[ ! -f /usr/local/V2bX/V2bX ]]; then
         return 2
@@ -81,7 +67,6 @@ check_status() {
         fi
     fi
 }
-
 install_V2bX() {
     if [[ -d /usr/local/V2bX/ ]]; then
         find /usr/local/V2bX/ -type f -not -name "config.json" -delete 2>/dev/null
@@ -92,19 +77,10 @@ install_V2bX() {
 
     if [ $# == 0 ] ;then
         last_version=$(curl -Ls --connect-timeout 8 "https://api.github.com/repos/wyx2685/V2bX/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        if [[ ! -n "$last_version" ]]; then
-            echo -e "${yellow}警告: API 请求受限，启用本地硬编码默认版本安装...${plain}"
-            last_version="v0.1.7" # 硬编码防爆底线
-        fi
+        [[ ! -n "$last_version" ]] && last_version="v0.1.7"
         
-        echo -e "准备安装 V2bX 版本：${last_version}"
-        # 核心优化：如果主线GitHub超时，自动切ghproxy镜像源加速
         url="https://github.com/wyx2685/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip"
-        wget --no-check-certificate -N --timeout=10 --tries=2 -O /usr/local/V2bX/V2bX-linux.zip "${url}"
-        if [[ $? -ne 0 ]]; then
-            echo -e "${yellow}主线连接超时，正在切换加速镜像站下载...${plain}"
-            wget --no-check-certificate -N --timeout=15 -O /usr/local/V2bX/V2bX-linux.zip "https://ghproxy.net/${url}"
-        fi
+        wget --no-check-certificate -N --timeout=10 --tries=2 -O /usr/local/V2bX/V2bX-linux.zip "${url}" || wget --no-check-certificate -N --timeout=15 -O /usr/local/V2bX/V2bX-linux.zip "https://ghproxy.net/${url}"
     else
         last_version=$1
         url="https://github.com/wyx2685/V2bX/releases/download/${last_version}/V2bX-linux-${arch}.zip"
@@ -117,6 +93,7 @@ install_V2bX() {
     mkdir /etc/V2bX/ -p
     [[ -f geoip.dat ]] && cp geoip.dat /etc/V2bX/
     [[ -f geosite.dat ]] && cp geosite.dat /etc/V2bX/
+    
     if [[ x"${release}" == x"alpine" ]]; then
         rm /etc/init.d/V2bX -f
         cat <<EOF > /etc/init.d/V2bX
@@ -136,7 +113,6 @@ EOF
 [Unit]
 Description=V2bX Service
 After=network.target nss-lookup.target
-Wants=network.target
 
 [Service]
 User=root
@@ -160,9 +136,6 @@ EOF
         first_install=true
     else
         if [[ x"${release}" == x"alpine" ]]; then service V2bX restart >/dev/null 2>&1; else systemctl restart V2bX >/dev/null 2>&1; fi
-        sleep 1.5
-        check_status
-        [[ $? == 0 ]] && echo -e "${green}V2bX 节点重启成功！${plain}" || echo -e "${red}启动失败，请检查/etc/V2bX/config.json格式${plain}"
         first_install=false
     fi
 
@@ -170,24 +143,85 @@ EOF
         [[ ! -f /etc/V2bX/${json_file}.json && -f ${json_file}.json ]] && cp ${json_file}.json /etc/V2bX/
     done
 
-    curl -o /usr/bin/V2bX -Ls https://raw.githubusercontent.com/wyx2685/V2bX-script/master/V2bX.sh && chmod +x /usr/bin/V2bX
+    # 核心优化：把下载管理菜单的地址永久重定向到你自己的专属仓库
+    curl -o /usr/bin/V2bX -Ls "${MY_GITHUB}/xiaomaimai" && chmod +x /usr/bin/V2bX
     [[ ! -L /usr/bin/v2bx ]] && ln -s /usr/bin/V2bX /usr/bin/v2bx 2>/dev/null && chmod +x /usr/bin/v2bx 2>/dev/null
     
     cd $cur_dir
-    clear
-    echo -e "${green}=========================================="
-    echo -e "V2bX 节点端极致优化版安装完成！"
-    echo -e "输入 V2bX 或 v2bx 即可呼出管理菜单"
-    echo -e "==========================================${plain}"
-    
-    if [[ $first_install == true ]]; then
-        read -rp "首次安装，是否立即自动生成配置文件？(y/n): " if_generate
-        if [[ $if_generate == [Yy] ]]; then
-            curl -o ./initconfig.sh -Ls https://raw.githubusercontent.com/wyx2685/V2bX-script/master/initconfig.sh
-            source initconfig.sh && rm initconfig.sh -f && generate_config_file
-        fi
+}
+start_service() {
+    check_status
+    if [[ $? == 0 ]]; then echo -e "${green}V2bX 已经在运行中...${plain}"; else
+        if [[ x"${release}" == x"alpine" ]]; then service V2bX start >/dev/null 2>&1; else systemctl start V2bX >/dev/null 2>&1; fi
+        sleep 1 && check_status
+        [[ $? == 0 ]] && echo -e "${green}V2bX 启动成功${plain}" || echo -e "${red}启动失败，请查看日志${plain}"
     fi
 }
 
-install_base
-install_V2bX $1
+stop_service() {
+    if [[ x"${release}" == x"alpine" ]]; then service V2bX stop >/dev/null 2>&1; else systemctl stop V2bX >/dev/null 2>&1; fi
+    sleep 1 && check_status
+    [[ $? == 1 ]] && echo -e "${green}V2bX 停止成功${plain}" || echo -e "${red}停止失败${plain}"
+}
+
+show_log() {
+    if [[ x"${release}" == x"alpine" ]]; then echo -e "${yellow}Alpine系统请前往 /var/log/ 查看日志${plain}"; else
+        journalctl -u V2bX --no-pager -n 50
+    fi
+}
+
+show_menu() {
+    clear
+    echo -e "${green}  V2bX 后端管理脚本 (独家定制版)${plain}"
+    # 这一行完美修改成了你的专属 GitHub 仓库地址
+    echo -e "${green}--- https://github.com/yunfeibuzai/-. ---${plain}"
+    echo -e "  ${green}0.${plain} 修改配置"
+    echo -e "————————————————"
+    echo -e "  ${green}1.${plain} 安装 V2bX"
+    echo -e "  ${green}2.${plain} 更新 V2bX"
+    echo -e "  ${green}3.${plain} 卸载 V2bX"
+    echo -e "————————————————"
+    echo -e "  ${green}4.${plain} 启动 V2bX"
+    echo -e "  ${green}5.${plain} 停止 V2bX"
+    echo -e "  ${green}6.${plain} 重启 V2bX"
+    echo -e "  ${green}7.${plain} 查看 V2bX 状态"
+    echo -e "  ${green}8.${plain} 查看 V2bX 日志"
+    echo -e "————————————————"
+    echo -e "  ${green}17.${plain} 退出脚本"
+    
+    echo -e "————————————————"
+    check_status
+    case $? in
+        0) echo -e "V2bX状态: ${green}已运行${plain}" ;;
+        1) echo -e "V2bX状态: ${red}未运行${plain}" ;;
+        2) echo -e "V2bX状态: ${yellow}未安装${plain}" ;;
+    esac
+    
+    read -rp "请输入选择 [0-17]: " select_menu
+    case $select_menu in
+        0) nano /etc/V2bX/config.json ;;
+        1) install_base && install_V2bX ;;
+        2) install_V2bX ;;
+        3) stop_service && rm -rf /usr/local/V2bX /usr/bin/V2bX /usr/bin/v2bx ;;
+        4) start_service ;;
+        5) stop_service ;;
+        6) stop_service && start_service ;;
+        7) check_status && [[ $? == 0 ]] && echo -e "状态: ${green}正在运行${plain}" || echo -e "状态: ${red}未运行${plain}" ;;
+        8) show_log ;;
+        17) exit 0 ;;
+        *) echo -e "${red}请输入正确的数字${plain}" ;;
+    esac
+}
+
+if [[ $# == 0 ]]; then
+    show_menu
+else
+    case $1 in
+        start) start_service ;;
+        stop) stop_service ;;
+        restart) stop_service && start_service ;;
+        status) check_status && [[ $? == 0 ]] && echo "运行中" || echo "未运行" ;;
+        log) show_log ;;
+        *) show_menu ;;
+    esac
+fi
